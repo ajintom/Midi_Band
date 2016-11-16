@@ -1,0 +1,231 @@
+#include "Wire.h"
+#include "I2Cdev.h"
+#include "MPU6050.h"
+#include "HMC5883L.h"
+
+#define C4 0x30
+#define Cs4 0x31
+#define D4 0x32
+#define E4 0x34
+#define F4 0x35
+#define G4 0x37
+#define A4a 0x39
+#define B4 0x3B
+
+#define C5 0x3C
+#define D5 0x3E
+#define E5 0x40
+#define F5 0x41
+#define G5 0x43
+#define A5a 0x45
+#define As5 0x46
+#define B5 0x47
+#define C6 0x48
+#define Cs6 0x49
+
+#define n1 A1
+#define n2 A2
+#define n3 A3
+#define n4 8
+#define n5 12
+#define n6 13
+
+#define led1 0 //bottom to up
+#define led2 1
+#define led3 11
+#define led4 10
+#define led5 4
+#define led6 7
+
+#define pwm1 3 //left to right
+#define pwm2 5
+#define pwm3 6
+#define pwm4 9
+
+MPU6050 accelgyro;
+HMC5883L mag;
+
+int16_t ax, ay, az;
+int16_t gx, gy, gz;
+int16_t mx, my, mz;
+int Edit;
+
+int c;
+int x,y;
+const int d=10; //delay
+int ctr=0x10; // controller number 16
+int ch=0;
+int chmax=15;
+int a0flag=0;
+int arr[6]={0,0,0,0,0,0};
+const int size_of_i=6;
+int i=0;
+int note[size_of_i][6]= { {0x4C,D5,E5,F5,G5,A5a} , {C5,C5,G5,G5,A5a,A5a} , {F5,F5,E5,E5,D5,D5} , {C5,G5,C6,C5,As5,A5a} , {C5,G5,C6,C5,As5,A5a} , {C4,Cs4,D4,E4,C6,Cs6} }    ;
+
+
+void setup() {
+  
+   Wire.begin();
+   accelgyro.setI2CMasterModeEnabled(false);
+   accelgyro.setI2CBypassEnabled(true) ;
+   accelgyro.setSleepEnabled(false);
+
+   Serial.begin(115200);
+   accelgyro.initialize();
+   mag.initialize();
+   
+   pinMode(A0,INPUT_PULLUP); //channel switch
+   
+   pinMode(n1,INPUT_PULLUP);  //note array
+   pinMode(n2,INPUT_PULLUP);
+   pinMode(n3,INPUT_PULLUP);
+   pinMode(n4,INPUT_PULLUP);
+   pinMode(n5,INPUT_PULLUP);
+   pinMode(n6,INPUT_PULLUP);  //note array
+   
+   pinMode(led1,OUTPUT);
+   pinMode(led2,OUTPUT);
+   pinMode(led3,OUTPUT);     //might be pwm
+   pinMode(led4,OUTPUT);     //might be pwm
+   pinMode(led5,OUTPUT);
+   pinMode(led6,OUTPUT);
+   
+   pinMode(pwm1,OUTPUT);    
+   pinMode(pwm2,OUTPUT);    
+   pinMode(pwm3,OUTPUT);
+   pinMode(pwm4,OUTPUT);
+   
+   midi(0xE0,0x00,0x40);
+   
+}
+
+void loop() {
+  // delay(400);
+
+//----------------------------------------------------------      
+      if ((digitalRead(A0)==LOW) && (a0flag==0))
+      {
+          a0flag=1;
+          ch=ch+1;
+          i=i+1;
+          if (ch>chmax)
+             ch=0;
+          if (i>size_of_i)
+             i=0;   
+      } 
+      else if  ((digitalRead(A0)==HIGH) && (a0flag==1))    
+      {
+          a0flag=0;
+      }  
+//----------------------------------------------------------
+//__________________________________________________________
+
+if ((digitalRead(n1)==LOW)&&(arr[0]==0))
+  {
+      midi((0x90 | ch),note[i][0],0x55);
+      arr[0]=1;
+      while(1)
+      {
+          if (digitalRead(n1)==HIGH)
+              {
+                  arr[0]=0;
+                  midi((0x80 | ch),note[i][0],0x55);
+                  break;
+              }
+        
+          x=getax();
+          y=getay();
+          
+          delay(d);
+          
+          midi((0xE0 | ch) ,0,x);
+          midi((0xB0 | ch),ctr,y);
+          
+      }
+  }
+//--------------------------------
+
+      
+         
+      
+      
+      
+
+}
+
+
+int getax()
+{
+     accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+   mag.getHeading(&mx, &my, &mz);
+
+// To calculate heading in degrees. 0 degree indicates North
+   float heading = atan2(my, mx);
+   if(heading < 0)
+     heading += 2 * M_PI;
+  // Serial.print("heading:\t");
+       
+     ax=map(ax,-16950,16950,0,127);
+   
+    // ay=map(ay,-16950,16950,0,127); 
+     if(ax>127)
+     ax=127;
+     else if(ax<0)
+     ax=0;
+    // if(ay>127)
+    // ay=127;
+    // else if(ay<0)
+    // ay=0;
+    
+    return(ax);
+     
+    /*  Serial.println(); 
+      Serial.print(ax); 
+      Serial.print("\t\t");
+      Serial.print(ay); */
+}  
+
+int getay()
+{
+  
+     accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+   mag.getHeading(&mx, &my, &mz);
+
+// To calculate heading in degrees. 0 degree indicates North
+   float heading = atan2(my, mx);
+   if(heading < 0)
+     heading += 2 * M_PI;
+  // Serial.print("heading:\t");
+       
+     //ax=map(ax,-16950,16950,0,127);
+     ay=map(ay,-16950,16950,0,127); 
+    
+   // analogWrite(pwm2,ay);
+    // analogWrite(pwm3,127-ay);
+    
+     /*if(ax>127)
+     ax=127;
+     else if(ax<0)
+     ax=0;*/
+     if(ay>127)
+     ay=127;
+     else if(ay<0)
+     ay=0;
+     
+     
+     
+     return (ay);
+     
+    /*  Serial.println(); 
+      Serial.print(ax); 
+      Serial.print("\t\t");
+      Serial.print(ay); */
+}
+
+
+void midi(int cmd, int data1, int data2)
+{
+Serial.write(cmd);
+Serial.write(data1);
+Serial.write(data2);
+}
